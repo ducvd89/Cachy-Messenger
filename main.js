@@ -1,7 +1,7 @@
 const { app, BrowserWindow, session, Tray, Menu, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 
-// [WINDOWS] Đăng ký ID để hiện thông báo Native
+// [WINDOWS] Register App User Model ID for native notifications
 if (process.platform === 'win32') {
     app.setAppUserModelId('com.cachyos.messenger');
 }
@@ -10,17 +10,114 @@ let win;
 let tray = null;
 let isQuitting = false;
 
-// --- XỬ LÝ LỆNH THOÁT TRÊN MACOS (Cmd + Q) ---
+// --- HANDLE MACOS QUIT COMMAND (Cmd + Q) ---
 app.on('before-quit', () => {
     isQuitting = true;
 });
 
-// --- CHỐNG MỞ NHIỀU CỬA SỔ ---
+// --- SINGLE INSTANCE LOCK ---
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
     app.quit();
 } else {
+    // Define icon path globally
+    const iconPath = process.platform === 'win32' ? path.join(__dirname, 'icon.ico') : path.join(__dirname, 'icon.png');
+
+    // --- HELPER: EXTRACT AND OPEN EXTERNAL LINKS ---
+    const handleExternalLink = (urlToOpen) => {
+        try {
+            const parsed = new URL(urlToOpen);
+            // Check for Facebook link shims
+            if ((parsed.hostname === 'l.facebook.com' || parsed.hostname === 'lm.facebook.com') && parsed.pathname === '/l.php') {
+                const originalUrl = parsed.searchParams.get('u');
+                if (originalUrl) {
+                    // searchParams.get() already decodes the URL. No need for decodeURIComponent.
+                    shell.openExternal(originalUrl);
+                    return;
+                }
+            }
+            // Standard external links
+            shell.openExternal(urlToOpen);
+        } catch (err) {
+            if (urlToOpen.startsWith('http')) shell.openExternal(urlToOpen);
+        }
+    };
+
+    // --- GLOBAL WEB CONTENTS GUARD (Monitors Main Window & All Popups) ---
+    app.on('web-contents-created', (event, contents) => {
+        // Intercept new window creations (e.g., target="_blank" or window.open)
+        contents.setWindowOpenHandler(({ url }) => {
+            // Allow about:blank (used by Messenger as a stepping stone for calls and popups)
+            if (url === 'about:blank' || url.startsWith('about:')) {
+                return {
+                    action: 'allow',
+                    overrideBrowserWindowOptions: {
+                        autoHideMenuBar: true,
+                        icon: iconPath,
+                        webPreferences: {
+                            nodeIntegration: false,
+                            contextIsolation: true
+                        }
+                    }
+                };
+            }
+
+            try {
+                const parsedUrl = new URL(url);
+                const isLinkShim = (parsedUrl.hostname === 'l.facebook.com' || parsedUrl.hostname === 'lm.facebook.com') && parsedUrl.pathname === '/l.php';
+
+                // Allow internal links (excluding tracking shims)
+                if (!isLinkShim && (parsedUrl.hostname.includes('messenger.com') || parsedUrl.hostname.includes('facebook.com'))) {
+                    return {
+                        action: 'allow',
+                        overrideBrowserWindowOptions: {
+                            autoHideMenuBar: true,
+                            icon: iconPath,
+                            webPreferences: {
+                                nodeIntegration: false,
+                                contextIsolation: true
+                            }
+                        }
+                    };
+                } else {
+                    handleExternalLink(url);
+                    return { action: 'deny' };
+                }
+            } catch (err) {
+                handleExternalLink(url);
+                return { action: 'deny' };
+            }
+        });
+
+        // Intercept all in-page navigations and redirects
+        const navigateHandler = (event, url) => {
+            if (url === 'about:blank' || url.startsWith('about:')) return;
+
+            try {
+                const parsedUrl = new URL(url);
+                const isLinkShim = (parsedUrl.hostname === 'l.facebook.com' || parsedUrl.hostname === 'lm.facebook.com') && parsedUrl.pathname === '/l.php';
+
+                // Block external links or Facebook shims from loading inside the app
+                if (isLinkShim || (!parsedUrl.hostname.includes('messenger.com') && !parsedUrl.hostname.includes('facebook.com'))) {
+                    event.preventDefault();
+                    handleExternalLink(url);
+
+                    // If this navigation happened inside a temporary popup window, close the popup to prevent a blank screen
+                    if (win && contents !== win.webContents) {
+                        const popupWin = BrowserWindow.fromWebContents(contents);
+                        if (popupWin) popupWin.close();
+                    }
+                }
+            } catch (err) {
+                console.error("URL Parsing Error: ", err);
+            }
+        };
+
+        contents.on('will-navigate', navigateHandler);
+        contents.on('will-redirect', navigateHandler);
+    });
+
     app.on('second-instance', () => {
         if (win) {
             if (!win.isVisible()) win.show();
@@ -30,25 +127,20 @@ if (!gotTheLock) {
     });
 
     function createWindow() {
-        // [ĐA NỀN TẢNG] Nhận diện Icon: Mac dùng .png/.icns, Win dùng .ico, Linux dùng .png
-        let iconName = 'icon.png';
-        if (process.platform === 'win32') iconName = 'icon.ico';
-        // (Build macOS sẽ dùng icon.icns cấu hình trong package.json, ở dev dùng icon.png là đủ)
-
         win = new BrowserWindow({
             width: 1200,
             height: 800,
             title: "Messenger",
-            icon: path.join(__dirname, iconName),
-                                autoHideMenuBar: true, // Ẩn menu mặc định trên Win/Linux
-                                webPreferences: {
-                                    nodeIntegration: false,
-                                    contextIsolation: true,
-                                    preload: path.join(__dirname, 'preload.js')
-                                }
+            icon: iconPath,
+            autoHideMenuBar: true,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, 'preload.js')
+            }
         });
 
-        // --- XỬ LÝ MENU CHO MACOS ---
+        // --- MACOS MENU CONFIGURATION ---
         if (process.platform === 'darwin') {
             const template = [
                 {
@@ -62,11 +154,11 @@ if (!gotTheLock) {
                         { role: 'hideOthers' },
                         { role: 'unhide' },
                         { type: 'separator' },
-                        { role: 'quit' } // Phím tắt Cmd + Q hoạt động ở đây
+                        { role: 'quit' }
                     ]
                 },
                 {
-                    label: 'Edit', // Bắt buộc phải có để Cmd+C, Cmd+V hoạt động
+                    label: 'Edit',
                     submenu: [
                         { role: 'undo' },
                         { role: 'redo' },
@@ -81,45 +173,7 @@ if (!gotTheLock) {
             Menu.setApplicationMenu(Menu.buildFromTemplate(template));
         }
 
-        // --- XỬ LÝ MỞ LINK & POPUP GỌI ĐIỆN ---
-        win.webContents.setWindowOpenHandler(({ url }) => {
-            try {
-                const parsedUrl = new URL(url);
-                if (parsedUrl.hostname.includes('messenger.com') || parsedUrl.hostname.includes('facebook.com')) {
-                    return {
-                        action: 'allow',
-                        overrideBrowserWindowOptions: {
-                            autoHideMenuBar: true,
-                            icon: path.join(__dirname, iconName),
-                                             webPreferences: {
-                                                 nodeIntegration: false,
-                                                 contextIsolation: true
-                                             }
-                        }
-                    };
-                } else {
-                    shell.openExternal(url);
-                    return { action: 'deny' };
-                }
-            } catch (err) {
-                shell.openExternal(url);
-                return { action: 'deny' };
-            }
-        });
-
-        win.webContents.on('will-navigate', (event, url) => {
-            try {
-                const parsedUrl = new URL(url);
-                if (!parsedUrl.hostname.includes('messenger.com') && !parsedUrl.hostname.includes('facebook.com')) {
-                    event.preventDefault();
-                    shell.openExternal(url);
-                }
-            } catch (err) {
-                console.error("Lỗi URL: ", err);
-            }
-        });
-
-        // --- LOGIC KẾT NỐI VÀ TẢI TRANG ---
+        // --- CONNECTION & PAGE LOADING LOGIC ---
         let retryCount = 0;
         const maxRetries = 10;
 
@@ -138,41 +192,42 @@ if (!gotTheLock) {
 
             if (retryCount < maxRetries) {
                 retryCount++;
-                console.log(`Mất mạng. Đang thử kết nối lại... Lần ${retryCount}/${maxRetries}`);
+                console.log(`Network disconnected. Retrying... Attempt ${retryCount}/${maxRetries}`);
                 setTimeout(() => { if (win) loadMessenger(); }, 5000);
             } else {
                 dialog.showErrorBox(
-                    'Lỗi kết nối mạng',
-                    'Không thể kết nối đến Messenger. Vui lòng kiểm tra lại đường truyền và chọn "Tải lại trang" từ khay hệ thống.'
+                    'Network Error',
+                    'Cannot connect to Messenger. Please check your internet connection and select "Reload" from the system tray.'
                 );
                 win.loadURL(`data:text/html;charset=utf-8,
-                            <body style="display:flex;justify-content:center;align-items:center;height:100vh;background-color:#1e1e1e;color:white;">
-                            <h2>Không có kết nối Internet 🌐</h2>
+                            <body style="display:flex;justify-content:center;align-items:center;height:100vh;background-color:#1e1e1e;color:white;font-family:sans-serif;">
+                            <div style="text-align:center;">
+                            <h2>No Internet Connection 🌐</h2>
+                            <p>Please check your network and refresh the application.</p>
+                            </div>
                             </body>
                             `);
             }
         });
 
-        // Xử lý khi nhấn nút Đóng (X)
+        // Handle Close (X) button
         win.on('close', (event) => {
             if (!isQuitting) {
                 event.preventDefault();
-                win.hide(); // Ẩn xuống Tray trên Win/Linux, hoặc xuống Dock trên Mac
+                win.hide();
             }
         });
     }
 
-    // --- KHỞI TẠO SYSTEM TRAY ---
+    // --- SYSTEM TRAY INITIALIZATION ---
     function createTray() {
-        let iconName = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
-
-        tray = new Tray(path.join(__dirname, iconName));
+        tray = new Tray(iconPath);
 
         const contextMenu = Menu.buildFromTemplate([
-            { label: 'Mở Messenger', click: () => win.show() },
-                                                   { label: 'Tải lại trang (Refresh)', click: () => { if (win) { win.reload(); win.show(); } } },
+            { label: 'Show Messenger', click: () => win.show() },
+                                                   { label: 'Reload', click: () => { if (win) { win.reload(); win.show(); } } },
                                                    { type: 'separator' },
-                                                   { label: 'Thoát hẳn', click: () => {
+                                                   { label: 'Quit', click: () => {
                                                        isQuitting = true;
                                                        app.quit();
                                                    }}
@@ -186,21 +241,20 @@ if (!gotTheLock) {
         });
     }
 
-    // --- CẬP NHẬT THÔNG BÁO ---
+    // --- NOTIFICATION BADGE UPDATE ---
     ipcMain.on('update-badge', (event, count) => {
         const titleText = count ? `Messenger (${count})` : 'Messenger';
-        const tooltipText = count ? `Messenger (${count} tin nhắn chưa đọc)` : 'Messenger';
+        const tooltipText = count ? `Messenger (${count} unread messages)` : 'Messenger';
 
         if (win) win.setTitle(titleText);
         if (tray) tray.setToolTip(tooltipText);
 
-        // [MACOS / UBUNTU] Hiển thị chấm đỏ đếm số trên thanh Dock
         if (app.setBadgeCount) {
             app.setBadgeCount(count ? parseInt(count) : 0);
         }
     });
 
-    // --- CHẠY ỨNG DỤNG ---
+    // --- APP INITIALIZATION ---
     app.whenReady().then(() => {
         session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
             const allowed = ['media', 'notifications', 'fullscreen'];
@@ -210,7 +264,7 @@ if (!gotTheLock) {
         createWindow();
         createTray();
 
-        // [MACOS] Xử lý khi click vào icon ứng dụng trên thanh Dock
+        // [MACOS] Handle click on Dock icon
         app.on('activate', () => {
             if (BrowserWindow.getAllWindows().length === 0) {
                 createWindow();
@@ -220,9 +274,8 @@ if (!gotTheLock) {
         });
     });
 
-    // Xử lý đóng tất cả cửa sổ
+    // Handle all windows closed
     app.on('window-all-closed', () => {
-        // Trên Mac, app thường sống trong nền dù đã đóng hết cửa sổ
         if (process.platform !== 'darwin' && isQuitting) {
             app.quit();
         }
