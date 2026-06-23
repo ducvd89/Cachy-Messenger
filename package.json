@@ -1,12 +1,14 @@
 {
-  "name": "cachy-messenger",
+  "name": "messenger-desktop",
   "version": "1.0.0",
-  "description": "Facebook Messenger Client for CachyOS",
-  "homepage": "https://github.com/your-username/cachy-messenger",
+  "description": "Facebook Messenger Client",
+  "homepage": "https://github.com/your-username/messenger",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --linux pacman"
+    "build:linux": "electron-builder --linux pacman",
+    "build:win": "electron-builder --win nsis",
+    "build:all": "electron-builder --linux pacman --win nsis"
   },
   "author": {
     "name": "Cid Highwind",
@@ -15,14 +17,22 @@
   "license": "ISC",
   "build": {
     "appId": "com.cachyos.messenger",
-    "productName": "CachyMessenger",
+    "productName": "Messenger",
     "linux": {
-      "target": [
-        "pacman"
-      ],
+      "target": ["pacman"],
       "category": "Network;InstantMessaging",
       "icon": "icon.png",
       "maintainer": "Cid Highwind <ducvd89@gmail.com>"
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     },
     "directories": {
       "output": "dist"
