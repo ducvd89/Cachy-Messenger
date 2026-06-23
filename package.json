@@ -1,0 +1,35 @@
+{
+  "name": "cachy-messenger",
+  "version": "1.0.0",
+  "description": "Facebook Messenger Client for CachyOS",
+  "homepage": "https://github.com/your-username/cachy-messenger",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --linux pacman"
+  },
+  "author": {
+    "name": "Cid Highwind",
+    "email": "ducvd89@gmail.com"
+  },
+  "license": "ISC",
+  "build": {
+    "appId": "com.cachyos.messenger",
+    "productName": "CachyMessenger",
+    "linux": {
+      "target": [
+        "pacman"
+      ],
+      "category": "Network;InstantMessaging",
+      "icon": "icon.png",
+      "maintainer": "Cid Highwind <ducvd89@gmail.com>"
+    },
+    "directories": {
+      "output": "dist"
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}
