@@ -1,13 +1,14 @@
 {
   "name": "messenger-desktop",
   "version": "1.0.0",
-  "description": "Facebook Messenger Client",
-  "homepage": "https://github.com/your-username/messenger",
+  "description": "Facebook Messenger Client Đa Nền Tảng",
+  "homepage": "https://github.com/cid-highwind/messenger-desktop",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build:linux": "electron-builder --linux pacman",
     "build:win": "electron-builder --win nsis",
+    "build:mac": "electron-builder --mac dmg",
     "build:all": "electron-builder --linux pacman --win nsis"
   },
   "author": {
@@ -18,28 +19,35 @@
   "build": {
     "appId": "com.cachyos.messenger",
     "productName": "Messenger",
+    "directories": {
+      "output": "dist"
+    },
     "linux": {
-      "target": ["pacman"],
-      "category": "Network;InstantMessaging",
+      "target": [
+        "pacman"
+      ],
+      "category": "Network",
       "icon": "icon.png",
       "maintainer": "Cid Highwind <ducvd89@gmail.com>"
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "icon.icns",
+      "category": "public.app-category.social-networking"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-    },
-    "directories": {
-      "output": "dist"
     }
-  },
-  "devDependencies": {
-    "electron": "^28.0.0",
-    "electron-builder": "^24.0.0"
   }
 }
