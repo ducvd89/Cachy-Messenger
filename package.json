@@ -1,53 +1,66 @@
 {
-  "name": "messenger-desktop",
+  "name": "fbmess",
+  "productName": "FB Messenger",
   "version": "1.0.0",
-  "description": "Facebook Messenger Client Đa Nền Tảng",
-  "homepage": "https://github.com/cid-highwind/messenger-desktop",
+  "description": "Ứng dụng Facebook Messenger cho máy tính, xây dựng bằng Electron",
   "main": "main.js",
-  "scripts": {
-    "start": "electron .",
-    "build:linux": "electron-builder --linux pacman",
-    "build:win": "electron-builder --win nsis",
-    "build:mac": "electron-builder --mac dmg",
-    "build:all": "electron-builder --linux pacman --win nsis"
-  },
+  "homepage": "https://www.messenger.com",
   "author": {
-    "name": "Cid Highwind",
+    "name": "Duc Vu",
     "email": "ducvd89@gmail.com"
   },
-  "license": "ISC",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux",
+    "dist:mac": "electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
   "build": {
-    "appId": "com.cachyos.messenger",
-    "productName": "Messenger",
+    "appId": "com.ducvd.fbmess",
+    "productName": "FB Messenger",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "compression": "normal",
+    "files": [
+      "main.js",
+      "error.html",
+      "assets/**/*"
+    ],
     "directories": {
       "output": "dist"
     },
-    "linux": {
-      "target": [
-        "pacman"
-      ],
-      "category": "Network",
-      "icon": "icon.png",
-      "maintainer": "Cid Highwind <ducvd89@gmail.com>"
-    },
     "win": {
       "target": [
-        "nsis"
+        { "target": "nsis", "arch": ["x64"] }
       ],
-      "icon": "icon.ico"
-    },
-    "mac": {
-      "target": [
-        "dmg"
-      ],
-      "icon": "icon.icns",
-      "category": "public.app-category.social-networking"
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
+    },
+    "linux": {
+      "target": ["pacman"],
+      "icon": "assets/icon.png",
+      "category": "Network;InstantMessaging",
+      "maintainer": "Duc Vu <ducvd89@gmail.com>",
+      "synopsis": "Facebook Messenger cho Linux",
+      "desktop": {
+        "StartupWMClass": "FB Messenger"
+      }
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "assets/icon.png",
+      "category": "public.app-category.social-networking"
     }
   }
 }

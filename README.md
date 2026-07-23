@@ -1,69 +1,38 @@
-# Messenger Desktop
+# FB Messenger Desktop
 
-A lightweight, native-feeling Facebook Messenger client tailored for Windows, macOS, and Linux. Built with Electron, it brings the full Messenger experience to your desktop with smart features and system integrations.
+Ứng dụng Facebook Messenger cho máy tính (Windows / macOS / Linux) xây dựng bằng Electron.
 
-## ✨ Features
+## Chạy thử
 
-* **Cross-Platform Support:** Run from a single codebase and build native installers for Windows (`.exe`), macOS (`.dmg`), and Linux (`.pacman`).
-* **System Tray & Dock Integration:** Minimizes to the system tray (or macOS Dock) to run seamlessly in the background. Quick actions available via right-click menu.
-* **Smart Notifications:** Displays unread message counts directly on the system tray tooltip, window title, and macOS/Ubuntu dock badges. Uses native system notifications.
-* **Intelligent Window Handling:** * Safely opens external links (like YouTube or news articles) in your default web browser.
-    * Native support for Messenger's Video and Audio calls (WebRTC) via dedicated internal popup windows.
-* **Auto-Reconnect (Network Resilience):** Automatically detects network drops and attempts to reconnect silently in the background. Provides a friendly offline screen if the connection drops completely.
-* **Single Instance Lock:** Prevents accidental multiple instances from opening and consuming excess memory.
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Ensure you have Node.js and npm installed on your system. 
-For Arch/CachyOS users:
 ```bash
-sudo pacman -S nodejs npm
+npm install
+npm start
 ```
 
-### Installation & Development
+## Đóng gói
 
-1. Clone this repository (or extract the source code) and navigate into the project directory.
-2. Install the required development dependencies:
-   ```bash
-   npm install
-   ```
-3. Run the app in development mode to test:
-   ```bash
-   npm start
-   ```
+| Lệnh | Kết quả |
+|---|---|
+| `npm run dist:win` | File cài đặt `.exe` (NSIS) cho Windows |
+| `npm run dist:linux` | Gói `.pacman` cho Arch/CachyOS (chạy trên máy Linux) |
+| `npm run dist:mac` | File `.dmg` cho macOS (chạy trên máy Mac) |
 
-## 📦 Building for Production
+File xuất ra nằm trong thư mục `dist/`.
 
-This project uses `electron-builder` to package the application. Ensure you have cleared the `dist/` folder before running a new build to avoid mixed installation files.
+> Lưu ý: gói `.pacman` phải build trên Linux, `.dmg` phải build trên macOS
+> (giới hạn của electron-builder). Build `.exe` thực hiện ngay trên Windows.
 
-### Build for Linux (Arch/CachyOS)
-```bash
-npm run build:linux
-```
+## Tính năng
 
-### Build for Windows
-```bash
-npm run build:win
-```
-
-### Build for macOS
-```bash
-npm run build:mac
-```
-*(Note: You must run this command on a macOS machine to successfully build a `.dmg` file).*
-
-### Build for All Platforms (Win/Linux)
-```bash
-npm run build:all
-```
-
-## 🛠️ Built With
-
-* [Electron](https://www.electronjs.org/) - The framework used to wrap the web app.
-* [Electron Builder](https://www.electron.build/) - Used for cross-platform packaging and installer generation.
-
-## 👤 Author
-
-**Cid Highwind** Email: ducvd89@gmail.com
+- Khay hệ thống: Mở ứng dụng / Tải lại trang / Thoát hẳn; bấm (X) chỉ ẩn app.
+- Đếm tin nhắn chưa đọc: tiêu đề cửa sổ, tooltip ở khay, chấm đỏ trên Taskbar
+  (Windows) và badge trên Dock (macOS) / Launcher (Linux).
+- Chuột phải: sao chép chữ, sao chép/lưu hình ảnh, sao chép/mở liên kết.
+- Link ngoài mở bằng trình duyệt mặc định; tự bóc URL gốc khỏi Link Shim
+  (`l.facebook.com/l.php?u=...`) để bỏ qua lớp tracking.
+- Cho phép popup `about:blank` và link nội bộ messenger.com/facebook.com để
+  gọi thoại / gọi video (WebRTC) hoạt động; chặn deep-link (`zalo://`, ...).
+- Mất mạng: tự thử lại tối đa 10 lần, hỏng hẳn thì hiện trang lỗi thân thiện,
+  có mạng lại thì tự kết nối.
+- macOS: có Application Menu để Cmd+C / Cmd+V / Cmd+Q hoạt động.
+- User-Agent Chrome mới cài toàn cục để không bị chặn "trình duyệt cũ".
