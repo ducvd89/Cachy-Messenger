@@ -1,7 +1,7 @@
 {
   "name": "fbmess",
   "productName": "FB Messenger",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "description": "Ứng dụng Facebook Messenger cho máy tính, xây dựng bằng Electron",
   "main": "main.js",
   "homepage": "https://www.messenger.com",

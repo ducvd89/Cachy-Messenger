@@ -31,6 +31,9 @@ const USER_AGENT =
 const MAX_RETRY = 10;
 const RETRY_DELAY_MS = 3000;
 
+// Cờ báo app được khởi động cùng hệ thống → mở ẩn dưới khay, không bung cửa sổ
+const AUTO_START_ARG = '--hidden';
+
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
@@ -107,6 +110,52 @@ function openExternal(url) {
     }
   } catch {
     /* URL hỏng — bỏ qua */
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Khởi động cùng hệ thống
+// Windows/macOS: dùng Login Items của hệ điều hành.
+// Linux: ghi file .desktop vào ~/.config/autostart (chuẩn XDG).
+// ---------------------------------------------------------------------------
+function linuxAutostartFile() {
+  return path.join(app.getPath('home'), '.config', 'autostart', 'fbmess.desktop');
+}
+
+function isAutoStartEnabled() {
+  if (process.platform === 'linux') {
+    return fs.existsSync(linuxAutostartFile());
+  }
+  // Windows: phải truy vấn với đúng args đã đăng ký, nếu không openAtLogin luôn false
+  return app.getLoginItemSettings({ args: [AUTO_START_ARG] }).openAtLogin;
+}
+
+function setAutoStart(enable) {
+  if (process.platform === 'linux') {
+    const file = linuxAutostartFile();
+    if (enable) {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(
+        file,
+        [
+          '[Desktop Entry]',
+          'Type=Application',
+          'Name=FB Messenger',
+          'Comment=Khởi động Messenger cùng hệ thống',
+          `Exec="${process.execPath}" ${AUTO_START_ARG}`,
+          'X-GNOME-Autostart-enabled=true',
+          '',
+        ].join('\n')
+      );
+    } else {
+      fs.rmSync(file, { force: true });
+    }
+  } else {
+    app.setLoginItemSettings({
+      openAtLogin: enable,
+      openAsHidden: true, // macOS: mở ẩn
+      args: [AUTO_START_ARG], // Windows: mở ẩn qua cờ --hidden
+    });
   }
 }
 
@@ -273,12 +322,13 @@ function handleLoadFailure(errorCode, errorDescription) {
 // ---------------------------------------------------------------------------
 // Cửa sổ chính
 // ---------------------------------------------------------------------------
-function createMainWindow() {
+function createMainWindow(startHidden = false) {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 400,
     minHeight: 500,
+    show: !startHidden,
     icon: getIconPath(),
     autoHideMenuBar: true,
     title: 'Messenger',
@@ -353,29 +403,41 @@ function showMainWindow() {
 // ---------------------------------------------------------------------------
 // Khay hệ thống
 // ---------------------------------------------------------------------------
+function buildTrayMenu() {
+  return Menu.buildFromTemplate([
+    { label: 'Mở ứng dụng', click: showMainWindow },
+    {
+      label: 'Tải lại trang (Refresh)',
+      click: () => {
+        retryCount = 0;
+        if (mainWindow) mainWindow.loadURL(APP_URL);
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Khởi động cùng hệ thống',
+      type: 'checkbox',
+      checked: isAutoStartEnabled(),
+      click: (item) => {
+        setAutoStart(item.checked);
+        tray.setContextMenu(buildTrayMenu()); // đồng bộ lại trạng thái tick
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Thoát hẳn',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+}
+
 function createTray() {
   tray = new Tray(getTrayIcon());
   tray.setToolTip('Messenger');
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: 'Mở ứng dụng', click: showMainWindow },
-      {
-        label: 'Tải lại trang (Refresh)',
-        click: () => {
-          retryCount = 0;
-          if (mainWindow) mainWindow.loadURL(APP_URL);
-        },
-      },
-      { type: 'separator' },
-      {
-        label: 'Thoát hẳn',
-        click: () => {
-          isQuitting = true;
-          app.quit();
-        },
-      },
-    ])
-  );
+  tray.setContextMenu(buildTrayMenu());
   tray.on('click', showMainWindow);
   tray.on('double-click', showMainWindow);
 }
@@ -413,7 +475,11 @@ if (!gotLock) {
       app.setAppUserModelId('com.ducvd.fbmess');
     }
     setupAppMenu();
-    createMainWindow();
+    // Khởi động cùng hệ thống → nằm im dưới khay, không bung cửa sổ
+    const startHidden =
+      process.argv.includes(AUTO_START_ARG) ||
+      app.getLoginItemSettings().wasOpenedAsHidden;
+    createMainWindow(startHidden);
     createTray();
   });
 
