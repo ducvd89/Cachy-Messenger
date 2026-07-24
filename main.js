@@ -141,7 +141,7 @@ function setAutoStart(enable) {
           '[Desktop Entry]',
           'Type=Application',
           'Name=FB Messenger',
-          'Comment=Khởi động Messenger cùng hệ thống',
+          'Comment=Start Messenger at login',
           `Exec="${process.execPath}" ${AUTO_START_ARG}`,
           'X-GNOME-Autostart-enabled=true',
           '',
@@ -172,7 +172,7 @@ function updateUnreadCount(title) {
   // Tooltip ở khay hệ thống
   if (tray) {
     tray.setToolTip(
-      count > 0 ? `Messenger — ${count} tin nhắn chưa đọc` : 'Messenger'
+      count > 0 ? `Messenger — ${count} unread messages` : 'Messenger'
     );
   }
 
@@ -187,7 +187,7 @@ function updateUnreadCount(title) {
       const badge = nativeImage.createFromPath(
         path.join(__dirname, 'assets', 'badge.png')
       );
-      mainWindow.setOverlayIcon(badge, `${count} tin nhắn chưa đọc`);
+      mainWindow.setOverlayIcon(badge, `${count} unread messages`);
     } else {
       mainWindow.setOverlayIcon(null, '');
     }
@@ -209,13 +209,13 @@ function buildContextMenu(contents, params) {
     const realLink = extractLinkShim(params.linkURL) || params.linkURL;
     menu.append(
       new MenuItem({
-        label: 'Mở liên kết bằng trình duyệt',
+        label: 'Open Link in Browser',
         click: () => openExternal(realLink),
       })
     );
     menu.append(
       new MenuItem({
-        label: 'Sao chép địa chỉ liên kết',
+        label: 'Copy Link Address',
         click: () => clipboard.writeText(realLink),
       })
     );
@@ -225,13 +225,13 @@ function buildContextMenu(contents, params) {
   if (params.mediaType === 'image') {
     menu.append(
       new MenuItem({
-        label: 'Sao chép hình ảnh',
+        label: 'Copy Image',
         click: () => contents.copyImageAt(params.x, params.y),
       })
     );
     menu.append(
       new MenuItem({
-        label: 'Lưu hình ảnh…',
+        label: 'Save Image…',
         click: () => contents.downloadURL(params.srcURL),
       })
     );
@@ -239,12 +239,12 @@ function buildContextMenu(contents, params) {
   }
 
   if (params.isEditable) {
-    menu.append(new MenuItem({ label: 'Cắt', role: 'cut' }));
-    menu.append(new MenuItem({ label: 'Sao chép', role: 'copy' }));
-    menu.append(new MenuItem({ label: 'Dán', role: 'paste' }));
-    menu.append(new MenuItem({ label: 'Chọn tất cả', role: 'selectAll' }));
+    menu.append(new MenuItem({ label: 'Cut', role: 'cut' }));
+    menu.append(new MenuItem({ label: 'Copy', role: 'copy' }));
+    menu.append(new MenuItem({ label: 'Paste', role: 'paste' }));
+    menu.append(new MenuItem({ label: 'Select All', role: 'selectAll' }));
   } else if (params.selectionText && params.selectionText.trim()) {
-    menu.append(new MenuItem({ label: 'Sao chép', role: 'copy' }));
+    menu.append(new MenuItem({ label: 'Copy', role: 'copy' }));
   }
 
   return menu.items.length > 0 ? menu : null;
@@ -306,14 +306,14 @@ function handleLoadFailure(errorCode, errorDescription) {
   if (retryCount < MAX_RETRY) {
     retryCount += 1;
     console.log(
-      `[FBMess] Mất kết nối (${errorDescription}). Thử lại lần ${retryCount}/${MAX_RETRY}...`
+      `[FBMess] Connection lost (${errorDescription}). Retry ${retryCount}/${MAX_RETRY}...`
     );
     clearTimeout(retryTimer);
     retryTimer = setTimeout(() => {
       if (mainWindow) mainWindow.loadURL(APP_URL);
     }, RETRY_DELAY_MS);
   } else {
-    console.log('[FBMess] Kết nối hỏng hoàn toàn, hiển thị trang báo lỗi.');
+    console.log('[FBMess] Connection failed permanently, showing error page.');
     retryCount = 0;
     mainWindow.loadFile(path.join(__dirname, 'error.html'));
   }
@@ -405,9 +405,9 @@ function showMainWindow() {
 // ---------------------------------------------------------------------------
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
-    { label: 'Mở ứng dụng', click: showMainWindow },
+    { label: 'Open App', click: showMainWindow },
     {
-      label: 'Tải lại trang (Refresh)',
+      label: 'Reload Page',
       click: () => {
         retryCount = 0;
         if (mainWindow) mainWindow.loadURL(APP_URL);
@@ -415,7 +415,7 @@ function buildTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Khởi động cùng hệ thống',
+      label: 'Start with System',
       type: 'checkbox',
       checked: isAutoStartEnabled(),
       click: (item) => {
@@ -425,7 +425,7 @@ function buildTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Thoát hẳn',
+      label: 'Quit',
       click: () => {
         isQuitting = true;
         app.quit();

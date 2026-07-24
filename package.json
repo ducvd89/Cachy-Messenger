@@ -2,7 +2,7 @@
   "name": "fbmess",
   "productName": "FB Messenger",
   "version": "1.1.1",
-  "description": "Ứng dụng Facebook Messenger cho máy tính, xây dựng bằng Electron",
+  "description": "Facebook Messenger desktop app built with Electron",
   "main": "main.js",
   "homepage": "https://www.messenger.com",
   "author": {
@@ -52,7 +52,7 @@
       "icon": "assets/icon.png",
       "category": "Network;InstantMessaging",
       "maintainer": "Duc Vu <ducvd89@gmail.com>",
-      "synopsis": "Facebook Messenger cho Linux",
+      "synopsis": "Facebook Messenger for Linux",
       "desktop": {
         "StartupWMClass": "FB Messenger"
       }
