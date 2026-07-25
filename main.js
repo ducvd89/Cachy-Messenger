@@ -115,47 +115,102 @@ function openExternal(url) {
 
 // ---------------------------------------------------------------------------
 // Khởi động cùng hệ thống
-// Windows/macOS: dùng Login Items của hệ điều hành.
+// Windows: dùng Task Scheduler (không bị Windows/AV vô hiệu hóa như Run key).
+// macOS: dùng Login Items của hệ điều hành.
 // Linux: ghi file .desktop vào ~/.config/autostart (chuẩn XDG).
 // ---------------------------------------------------------------------------
+const { execFileSync } = require('child_process');
+const WIN_TASK_NAME = 'FBMessengerAutoStart';
+
+function runPowerShell(command) {
+  execFileSync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', command],
+    { stdio: 'ignore', windowsHide: true }
+  );
+}
+
+function winTaskExists() {
+  try {
+    runPowerShell(
+      `if (Get-ScheduledTask -TaskName '${WIN_TASK_NAME}' -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }`
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function winTaskCreate() {
+  const exe = process.execPath.replace(/'/g, "''");
+  runPowerShell(
+    `$a = New-ScheduledTaskAction -Execute '${exe}' -Argument '${AUTO_START_ARG}'; ` +
+      `$t = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME; ` +
+      // ExecutionTimeLimit 0 = không giới hạn thời gian chạy (mặc định task bị ngắt sau 3 ngày)
+      `$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Seconds 0); ` +
+      `Register-ScheduledTask -TaskName '${WIN_TASK_NAME}' -Action $a -Trigger $t -Settings $s -Force | Out-Null`
+  );
+}
+
+function winTaskDelete() {
+  runPowerShell(
+    `Unregister-ScheduledTask -TaskName '${WIN_TASK_NAME}' -Confirm:$false -ErrorAction SilentlyContinue`
+  );
+}
+
 function linuxAutostartFile() {
   return path.join(app.getPath('home'), '.config', 'autostart', 'fbmess.desktop');
 }
 
+// Cache trạng thái để menu khay không phải gọi PowerShell mỗi lần mở
+let autoStartCache = null;
+
 function isAutoStartEnabled() {
+  if (process.platform === 'win32') {
+    if (autoStartCache === null) autoStartCache = winTaskExists();
+    return autoStartCache;
+  }
   if (process.platform === 'linux') {
     return fs.existsSync(linuxAutostartFile());
   }
-  // Windows: phải truy vấn với đúng args đã đăng ký, nếu không openAtLogin luôn false
-  return app.getLoginItemSettings({ args: [AUTO_START_ARG] }).openAtLogin;
+  return app.getLoginItemSettings().openAtLogin;
 }
 
 function setAutoStart(enable) {
-  if (process.platform === 'linux') {
-    const file = linuxAutostartFile();
-    if (enable) {
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(
-        file,
-        [
-          '[Desktop Entry]',
-          'Type=Application',
-          'Name=FB Messenger',
-          'Comment=Start Messenger at login',
-          `Exec="${process.execPath}" ${AUTO_START_ARG}`,
-          'X-GNOME-Autostart-enabled=true',
-          '',
-        ].join('\n')
-      );
+  try {
+    if (process.platform === 'win32') {
+      if (enable) {
+        winTaskCreate();
+        // Dọn phương pháp cũ (Registry Run key từ bản 1.1.x trước) để không khởi động 2 lần
+        app.setLoginItemSettings({ openAtLogin: false, args: [AUTO_START_ARG] });
+      } else {
+        winTaskDelete();
+      }
+      autoStartCache = winTaskExists(); // xác nhận trạng thái thật sau thao tác
+    } else if (process.platform === 'linux') {
+      const file = linuxAutostartFile();
+      if (enable) {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(
+          file,
+          [
+            '[Desktop Entry]',
+            'Type=Application',
+            'Name=FB Messenger',
+            'Comment=Start Messenger at login',
+            `Exec="${process.execPath}" ${AUTO_START_ARG}`,
+            'X-GNOME-Autostart-enabled=true',
+            '',
+          ].join('\n')
+        );
+      } else {
+        fs.rmSync(file, { force: true });
+      }
     } else {
-      fs.rmSync(file, { force: true });
+      app.setLoginItemSettings({ openAtLogin: enable, openAsHidden: true });
     }
-  } else {
-    app.setLoginItemSettings({
-      openAtLogin: enable,
-      openAsHidden: true, // macOS: mở ẩn
-      args: [AUTO_START_ARG], // Windows: mở ẩn qua cờ --hidden
-    });
+  } catch (err) {
+    console.log(`[FBMess] Failed to update auto-start: ${err.message}`);
   }
 }
 
